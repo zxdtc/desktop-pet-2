@@ -1,0 +1,28 @@
+{
+  "name": "desktop-pet-2",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first Windows intelligent emotional desktop pet MVP.",
+  "main": "src/main/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:vite": "vite --host 127.0.0.1",
+    "electron": "cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+    "start": "electron .",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "verify:deepseek": "node scripts/verify_deepseek_request.mjs",
+    "verify:pet-sprite": "python -m py_compile scripts/pet_action_pipeline.py scripts/verify_pet_action_pipeline.py scripts/verify_pet_sprite_e2e.py && python scripts/verify_pet_action_pipeline.py && python scripts/verify_pet_sprite_e2e.py && node scripts/verify_deepseek_request.mjs && node scripts/verify_pet_sprite_actions.mjs && node scripts/verify_pet_sprite_structure.mjs && node scripts/verify_pet_sprite_job_paths.mjs && node scripts/verify_pet_sprite_apply.mjs && node scripts/verify_pet_sprite_playback.mjs && node scripts/verify_pet_sprite_state.mjs && node scripts/verify_memory_engine.mjs && node --check src/main/main.js && node --check src/preload/panelPreload.cjs && node --check src/preload/panelPreload.js && npm run build"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.6",
+    "vite": "^7.2.7",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "lucide-react": "^0.562.0"
+  },
+  "devDependencies": {}
+}
