@@ -2032,6 +2032,59 @@ async function processPetSpriteRun(config = {}) {
   return result;
 }
 
+async function autoGeneratePetSpriteRun(config = {}) {
+  const runDirInput = String(config.runDir || state.petSpriteGenerator?.currentRunDir || '').trim();
+  const generateSpritesheet = typeof config === 'object' && config !== null && config.generateSpritesheet === false ? false : true;
+  const runDir = runDirInput && fs.existsSync(path.join(runDirInput, 'manifest.json'))
+    ? runDirInput
+    : (await createPetSpriteRun(config)).runDir;
+
+  const scriptPath = path.join(__dirname, '../../scripts/pet_auto_sprite_generator.py');
+  const generatedStdout = await runPython([
+    scriptPath,
+    '--run-dir', runDir
+  ], 180000);
+  const generated = JSON.parse(generatedStdout);
+  state = {
+    ...state,
+    petSpriteGenerator: {
+      ...state.petSpriteGenerator,
+      currentRunDir: runDir,
+      status: '已自动生成动作条，正在处理 GIF',
+      lastGenerationStatusPath: path.join(runDir, 'generation-status.json'),
+      autoGeneration: {
+        mode: generated.mode,
+        path: path.join(runDir, 'auto-generation.json'),
+        generatedAt: new Date().toISOString()
+      },
+      generationJobs: readPetSpriteJobs(runDir),
+      validationSummary: readPetSpriteValidationSummary(runDir),
+      previewMedia: readPetSpritePreviewMedia(runDir)
+    }
+  };
+  broadcastState();
+
+  const processed = await processPetSpriteRun({ runDir, generateSpritesheet });
+  state = {
+    ...state,
+    petSpriteGenerator: {
+      ...state.petSpriteGenerator,
+      currentRunDir: runDir,
+      status: processed.ok ? '自动生成 GIF 完成' : '自动生成完成，但有素材需要修复',
+      autoGeneration: {
+        ...(state.petSpriteGenerator?.autoGeneration || {}),
+        processedAt: new Date().toISOString()
+      },
+      generationJobs: readPetSpriteJobs(runDir),
+      validationSummary: readPetSpriteValidationSummary(runDir),
+      previewMedia: readPetSpritePreviewMedia(runDir)
+    }
+  };
+  addEvent('pet_sprite_auto_generated', `已从单张参考图自动生成动作 GIF：${runDir}`);
+  broadcastState();
+  return { runDir, generated, processed };
+}
+
 async function reviewPetSpriteRun(config = {}) {
   const runDir = assertPetSpriteRunDir(config.runDir, '记录 QA');
   const reviewStatus = String(config.status || '').trim();
@@ -2216,6 +2269,7 @@ function registerIpc() {
   });
   ipcMain.handle('sprite:structureActions', (_event, config) => structurePetSpriteActions(config));
   ipcMain.handle('sprite:createRun', (_event, config) => createPetSpriteRun(config));
+  ipcMain.handle('sprite:autoGenerateRun', (_event, config) => autoGeneratePetSpriteRun(config));
   ipcMain.handle('sprite:markJob', (_event, config) => markPetSpriteJob(config));
   ipcMain.handle('sprite:importJobImage', (_event, config) => importPetSpriteJobImage(config));
   ipcMain.handle('sprite:repairJob', (_event, config) => createPetSpriteRepairPrompt(config));

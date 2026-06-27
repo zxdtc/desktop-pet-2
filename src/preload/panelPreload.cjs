@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('desktopPet', {
   selectSpriteReference: () => ipcRenderer.invoke('sprite:selectReference'),
   structureSpriteActions: (config) => ipcRenderer.invoke('sprite:structureActions', config),
   createSpriteRun: (config) => ipcRenderer.invoke('sprite:createRun', config),
+  autoGenerateSpriteRun: (config) => ipcRenderer.invoke('sprite:autoGenerateRun', config),
   markSpriteJob: (config) => ipcRenderer.invoke('sprite:markJob', config),
   importSpriteJobImage: (config) => ipcRenderer.invoke('sprite:importJobImage', config),
   repairSpriteJob: (config) => ipcRenderer.invoke('sprite:repairJob', config),

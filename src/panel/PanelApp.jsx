@@ -652,6 +652,7 @@ function SpriteGenerator({ state }) {
   const [actionsText, setActionsText] = useState(JSON.stringify(defaultSpriteActions, null, 2));
   const [naturalLanguageActions, setNaturalLanguageActions] = useState('');
   const [structuringActions, setStructuringActions] = useState(false);
+  const [autoGenerating, setAutoGenerating] = useState(false);
   const [generateSpritesheet, setGenerateSpritesheet] = useState(true);
   const [markJobId, setMarkJobId] = useState('canonical-base');
   const [markStatus, setMarkStatus] = useState('generated');
@@ -739,6 +740,30 @@ function SpriteGenerator({ state }) {
       setMessage(result?.runDir ? `已创建：${result.runDir}` : '已创建运行目录');
     } catch (error) {
       setMessage(`创建失败：${error.message || error}`);
+    }
+  };
+
+  const autoGenerateRun = async () => {
+    try {
+      if (!actionsValidation.ok) {
+        setMessage(`动作配置有问题：${actionsValidation.errors[0]}`);
+        return;
+      }
+      setAutoGenerating(true);
+      const result = await callApi('autoGenerateSpriteRun', {
+        referencePath,
+        petName,
+        styleNotes,
+        chromaKey,
+        actions: actionsValidation.actions,
+        generateSpritesheet
+      });
+      const previewCount = result?.processed?.actions?.length || result?.generated?.actions?.length || 0;
+      setMessage(`已从参考图自动生成 ${previewCount} 个动作 GIF，请检查下方预览和 QA。`);
+    } catch (error) {
+      setMessage(`自动生成失败：${error.message || error}`);
+    } finally {
+      setAutoGenerating(false);
     }
   };
 
@@ -977,6 +1002,9 @@ function SpriteGenerator({ state }) {
           </label>
           <div className="event-buttons">
             <button className="primary" onClick={createRun} disabled={!actionsValidation.ok}><Sparkles size={18} /> 创建运行目录和提示词</button>
+            <button className="primary" onClick={autoGenerateRun} disabled={!actionsValidation.ok || autoGenerating || !referencePath.trim()}>
+              <Sparkles size={18} /> {autoGenerating ? '正在生成 GIF...' : '一键从参考图生成 GIF'}
+            </button>
             <button className="secondary" onClick={processRun}>处理 decoded 动作条</button>
           </div>
         </div>

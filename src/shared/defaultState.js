@@ -216,6 +216,7 @@ export const createDefaultState = () => ({
     generationJobs: [],
     validationSummary: null,
     previewMedia: null,
+    autoGeneration: null,
     appliedSprite: null,
     recentRuns: []
   },
