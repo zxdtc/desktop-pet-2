@@ -34,7 +34,7 @@ def sanitize_action_id(value):
 
 def load_manifest(run_dir):
     manifest_path = Path(run_dir) / "manifest.json"
-    return json.loads(manifest_path.read_text(encoding="utf-8"))
+    return json.loads(manifest_path.read_text(encoding="utf-8-sig"))
 
 
 def write_json(path, payload):
@@ -203,7 +203,7 @@ def workflow_doc(manifest):
 
 
 def init_run(args):
-    actions = json.loads(Path(args.actions).read_text(encoding="utf-8")) if args.actions else []
+    actions = json.loads(Path(args.actions).read_text(encoding="utf-8-sig")) if args.actions else []
     actions = actions.get("actions", actions) if isinstance(actions, dict) else actions
     if not isinstance(actions, list) or len(actions) < 1:
         raise ValueError("at least one action is required")

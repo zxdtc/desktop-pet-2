@@ -39,6 +39,39 @@ def remove_chroma(image, chroma, tolerance):
     return rgba
 
 
+def remove_edge_background(image, tolerance):
+    rgba = image.convert("RGBA")
+    if rgba.getchannel("A").getextrema()[0] < 255:
+        return rgba
+    corner_colors = [
+        rgba.getpixel((0, 0)),
+        rgba.getpixel((rgba.width - 1, 0)),
+        rgba.getpixel((0, rgba.height - 1)),
+        rgba.getpixel((rgba.width - 1, rgba.height - 1))
+    ]
+    background = max(corner_colors, key=corner_colors.count)
+    pixels = rgba.load()
+    visited = set()
+    stack = []
+    for x in range(rgba.width):
+        stack.append((x, 0))
+        stack.append((x, rgba.height - 1))
+    for y in range(rgba.height):
+        stack.append((0, y))
+        stack.append((rgba.width - 1, y))
+
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in visited or x < 0 or y < 0 or x >= rgba.width or y >= rgba.height:
+            continue
+        visited.add((x, y))
+        if not is_chroma_pixel(pixels[x, y], background, tolerance):
+            continue
+        pixels[x, y] = (0, 0, 0, 0)
+        stack.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
+    return rgba
+
+
 def fit_subject(image, cell_width, cell_height, padding=24):
     subject = image.convert("RGBA")
     bbox = subject.getchannel("A").getbbox()
@@ -132,9 +165,12 @@ def generate(args):
     source_path = run_dir / "reference.png"
     if not source_path.exists():
         raise FileNotFoundError(source_path)
-    subject = fit_subject(remove_chroma(Image.open(source_path), chroma, args.tolerance), cell_width, cell_height)
+    source_image = Image.open(source_path)
+    subject = fit_subject(remove_chroma(source_image, chroma, args.tolerance), cell_width, cell_height)
+    if subject.getchannel("A").getbbox() == (0, 0, subject.width, subject.height):
+        subject = fit_subject(remove_edge_background(source_image, args.background_tolerance), cell_width, cell_height)
     if not subject.getchannel("A").getbbox():
-        subject = fit_subject(Image.open(source_path).convert("RGBA"), cell_width, cell_height)
+        subject = fit_subject(source_image.convert("RGBA"), cell_width, cell_height)
 
     canonical = Image.new("RGBA", (cell_width, cell_height), (*chroma, 255))
     paste_center(canonical, subject)
@@ -166,6 +202,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--tolerance", type=int, default=80)
+    parser.add_argument("--background-tolerance", type=int, default=12)
     args = parser.parse_args()
     print(json.dumps(generate(args), ensure_ascii=False))
 
