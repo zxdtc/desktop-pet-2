@@ -81,20 +81,20 @@ const navItems = [
 const defaultSpriteActions = [
   {
     id: 'idle',
-    frame_count: 6,
-    description: 'calm breathing, tiny blink, slight head bob',
+    frame_count: 12,
+    description: '12-frame calm breathing loop, tiny blink, slight head bob, stable center',
     avoid: 'large gestures, walking, waving'
   },
   {
     id: 'happy',
-    frame_count: 6,
-    description: 'cheerful full-body reaction with a small bounce, same character identity',
+    frame_count: 12,
+    description: '12-frame happy reaction, smile, raised hand, light bounce, return to idle, stable center',
     avoid: 'floating hearts, stars, text, confetti'
   },
   {
     id: 'sad',
-    frame_count: 6,
-    description: 'subtle sad pose, drooping body, small expression change, loopable',
+    frame_count: 12,
+    description: '12-frame sad reaction, drooping body, lowered gaze, small loopable motion, stable center',
     avoid: 'detached tears, symbols, dramatic collapse'
   }
 ];
@@ -648,7 +648,7 @@ function SpriteGenerator({ state }) {
   const [referencePath, setReferencePath] = useState(generator.referencePath || '');
   const [petName, setPetName] = useState(state.character?.displayName || '小团子');
   const [styleNotes, setStyleNotes] = useState('保持参考图的角色身份，适合桌宠小尺寸显示。');
-  const [chromaKey, setChromaKey] = useState('#0000FF');
+  const [chromaKey, setChromaKey] = useState('#00FF00');
   const [actionsText, setActionsText] = useState(JSON.stringify(defaultSpriteActions, null, 2));
   const [naturalLanguageActions, setNaturalLanguageActions] = useState('');
   const [structuringActions, setStructuringActions] = useState(false);
@@ -759,7 +759,7 @@ function SpriteGenerator({ state }) {
         generateSpritesheet
       });
       const previewCount = result?.processed?.actions?.length || result?.generated?.actions?.length || 0;
-      setMessage(`已从参考图自动生成 ${previewCount} 个动作 GIF，请检查下方预览和 QA。`);
+      setMessage(`已用本地占位方式生成 ${previewCount} 个动作 GIF，请检查下方预览和 QA；最终表情素材仍应使用 image gen 动作条。`);
     } catch (error) {
       setMessage(`自动生成失败：${error.message || error}`);
     } finally {
@@ -967,8 +967,8 @@ function SpriteGenerator({ state }) {
           <label>
             Chroma Key
             <select value={chromaKey} onChange={(event) => setChromaKey(event.target.value)}>
-              <option value="#0000FF">#0000FF 蓝底</option>
               <option value="#00FF00">#00FF00 绿底</option>
+              <option value="#0000FF">#0000FF 蓝底</option>
             </select>
           </label>
           <label>
@@ -977,7 +977,7 @@ function SpriteGenerator({ state }) {
               className="compact-textarea"
               value={naturalLanguageActions}
               onChange={(event) => setNaturalLanguageActions(event.target.value)}
-              placeholder="例如：我要边牧，有待机、开心、难过三个动作，每个 6 帧。动作只用身体姿态表达，不要文字、符号和特效。"
+              placeholder="例如：我要边牧，有待机、开心、难过三个动作，每个 12 帧。动作只用身体姿态表达，不要文字、符号和特效。"
             />
           </label>
           <button className="secondary" onClick={structureActions} disabled={structuringActions || !naturalLanguageActions.trim()}>
@@ -1003,7 +1003,7 @@ function SpriteGenerator({ state }) {
           <div className="event-buttons">
             <button className="primary" onClick={createRun} disabled={!actionsValidation.ok}><Sparkles size={18} /> 创建运行目录和提示词</button>
             <button className="primary" onClick={autoGenerateRun} disabled={!actionsValidation.ok || autoGenerating || !referencePath.trim()}>
-              <Sparkles size={18} /> {autoGenerating ? '正在生成 GIF...' : '一键从参考图生成 GIF'}
+              <Sparkles size={18} /> {autoGenerating ? '正在生成占位 GIF...' : '本地占位生成 GIF'}
             </button>
             <button className="secondary" onClick={processRun}>处理 decoded 动作条</button>
           </div>

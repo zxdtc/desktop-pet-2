@@ -1592,7 +1592,7 @@ function addMemo(text, dueAt) {
 function normalizePetSpriteActions(actions = []) {
   return actions.map((action) => ({
     id: String(action.id || '').trim().replace(/[^a-zA-Z0-9_-]/g, ''),
-    frame_count: Math.max(1, Math.min(24, Number(action.frame_count || 1))),
+    frame_count: Math.max(1, Math.min(24, Number(action.frame_count || 12))),
     description: String(action.description || '').trim().slice(0, 1000),
     avoid: String(action.avoid || '').trim().slice(0, 500)
   })).filter((action) => action.id && action.description);
@@ -1607,7 +1607,7 @@ async function structurePetSpriteActions(config = {}) {
   const defaults = {
     petName: String(config.petName || state.character.displayName || '').trim(),
     styleNotes: String(config.styleNotes || '').trim(),
-    chromaKey: String(config.chromaKey || '#0000FF').trim() || '#0000FF'
+    chromaKey: String(config.chromaKey || '#00FF00').trim() || '#00FF00'
   };
   const requestPayload = {
     ...defaults,
@@ -1825,7 +1825,7 @@ async function createPetSpriteRun(config = {}) {
   const referencePath = String(config.referencePath || '').trim();
   const petName = String(config.petName || state.character.displayName || 'desktop-pet').trim().slice(0, 48);
   const styleNotes = String(config.styleNotes || '').trim().slice(0, 1000);
-  const chromaKey = String(config.chromaKey || '#0000FF').trim() || '#0000FF';
+  const chromaKey = String(config.chromaKey || '#00FF00').trim() || '#00FF00';
   const actions = normalizePetSpriteActions(config.actions || []);
   if (!referencePath || !fs.existsSync(referencePath)) throw new Error('请先选择一张角色参考图。');
   if (!actions.length) throw new Error('请至少填写一个动作。');

@@ -10,7 +10,7 @@ from PIL import Image, ImageChops, ImageDraw
 
 CELL_WIDTH = 192
 CELL_HEIGHT = 208
-DEFAULT_CHROMA = "#0000FF"
+DEFAULT_CHROMA = "#00FF00"
 
 
 def ensure_dir(path):
@@ -77,11 +77,14 @@ Action:
 {action.get("description", "")}
 
 Frame requirements:
-Create exactly {action["frame_count"]} separated full-body frames in one horizontal row.
-Each frame must fit a {manifest["cell_width"]}x{manifest["cell_height"]} desktop-pet cell.
+Create exactly {action["frame_count"]} coherent full-body frames in one horizontal row, ordered left to right.
+Treat the strip as {action["frame_count"]} equal fixed cells, each {manifest["cell_width"]}x{manifest["cell_height"]}.
+Keep the character centered inside every cell with the same visual scale, camera distance, and bottom-center anchor.
 Keep the full character visible in every frame with generous padding.
 No clipping, no overlap between frames, no body parts crossing frame boundaries.
-The motion should progress naturally across frames and loop cleanly if appropriate.
+The motion should progress naturally across all {action["frame_count"]} frames and loop cleanly if appropriate.
+Avoid jump cuts: adjacent frames should change pose smoothly, not teleport or resize.
+The expression and gesture must match the action semantics, not only move the original picture.
 
 Style:
 {style_notes}
@@ -89,7 +92,7 @@ The character should be readable at small desktop-pet size, with clear silhouett
 
 Background:
 Use a perfectly flat solid {chroma_key} chroma-key background across the whole strip.
-No gradients, no shadows, no floor, no scenery, no texture.
+No gradients, no anti-aliased background, no shadows, no floor, no scenery, no texture.
 Do not use the chroma-key color or close colors inside the character.
 
 Avoid:
@@ -139,9 +142,9 @@ Generate canonical-base.png for desktop pet action generation.
 Requirements:
 - Single complete full-body character.
 - Same face, body proportions, colors, markings, materials, silhouette, expression style, and signature features as the reference image.
-- Centered, generous padding, no clipping.
+- Centered in one fixed {manifest["cell_width"]}x{manifest["cell_height"]} cell, bottom-center anchored, generous padding, no clipping.
 - Readable at {manifest["cell_width"]}x{manifest["cell_height"]} desktop-pet size.
-- Flat solid {chroma_key} chroma-key background.
+- Perfectly flat solid {chroma_key} chroma-key background with no gradient or texture.
 - No text, labels, borders, UI, speech bubbles, icons, detached effects, shadows, floor, scene, white background, or checkerboard.
 
 Style:
@@ -163,6 +166,8 @@ def workflow_doc(manifest):
         "",
         "## 2. Generate action strips",
         "For each action, use both reference.png and decoded/canonical-base.png as identity references.",
+        "Generate one coherent horizontal 12-frame strip unless the manifest explicitly says another frame count.",
+        "Each frame must be one fixed cell with a pure solid chroma-key background, centered character, stable scale, and smooth adjacent-frame motion.",
         "Save each selected horizontal strip to the listed decoded path.",
         ""
     ]
@@ -190,6 +195,7 @@ def workflow_doc(manifest):
         "",
         "## 5. Visual QA",
         "- Review qa/contact-sheet.png and qa/previews/*.gif.",
+        "- Check identity, expression semantics, fixed-cell centering, stable scale, and adjacent-frame jump cuts.",
         "- If one action fails, mark that action as needing repair and generate a repair prompt.",
         "- Do not regenerate all actions when only one action failed.",
         "- Click `视觉 QA 通过` only after identity, action semantics, avoid list, and automated validation all pass.",
@@ -216,7 +222,7 @@ def init_run(args):
         if action_id in seen_action_ids:
             raise ValueError(f"duplicate action id: {action_id}")
         seen_action_ids.add(action_id)
-        frame_count = int(action.get("frame_count", 1))
+        frame_count = int(action.get("frame_count", 12))
         if frame_count < 1:
             raise ValueError(f"frame_count must be positive for {action_id}")
         description = str(action.get("description", "")).strip()
@@ -585,6 +591,86 @@ def motion_metrics(frames):
     }
 
 
+def alignment_metrics(frames):
+    metrics = {
+        "frame_count": len(frames),
+        "centers": [],
+        "sizes": [],
+        "bottom_centers": [],
+        "center_x_range": 0,
+        "center_y_range": 0,
+        "bottom_y_range": 0,
+        "width_delta_ratio": 0,
+        "height_delta_ratio": 0,
+        "max_size_delta_ratio": 0,
+        "max_adjacent_center_shift": 0,
+        "max_adjacent_size_delta_ratio": 0,
+        "jump_pairs": []
+    }
+    if not frames:
+        return metrics
+
+    for frame in frames:
+        bbox = bbox_alpha(frame)
+        if not bbox:
+            metrics["centers"].append(None)
+            metrics["sizes"].append(None)
+            metrics["bottom_centers"].append(None)
+            continue
+        left, top, right, bottom = bbox
+        width = right - left
+        height = bottom - top
+        center = ((left + right) / 2, (top + bottom) / 2)
+        bottom_center = ((left + right) / 2, bottom)
+        metrics["centers"].append([round(center[0], 2), round(center[1], 2)])
+        metrics["sizes"].append([width, height])
+        metrics["bottom_centers"].append([round(bottom_center[0], 2), round(bottom_center[1], 2)])
+
+    centers = [item for item in metrics["centers"] if item]
+    sizes = [item for item in metrics["sizes"] if item]
+    bottom_centers = [item for item in metrics["bottom_centers"] if item]
+    if centers:
+        xs = [item[0] for item in centers]
+        ys = [item[1] for item in centers]
+        metrics["center_x_range"] = round(max(xs) - min(xs), 2)
+        metrics["center_y_range"] = round(max(ys) - min(ys), 2)
+    if bottom_centers:
+        bottoms = [item[1] for item in bottom_centers]
+        metrics["bottom_y_range"] = round(max(bottoms) - min(bottoms), 2)
+    if sizes:
+        widths = [item[0] for item in sizes]
+        heights = [item[1] for item in sizes]
+        metrics["width_delta_ratio"] = round((max(widths) - min(widths)) / max(widths), 4) if max(widths) else 0
+        metrics["height_delta_ratio"] = round((max(heights) - min(heights)) / max(heights), 4) if max(heights) else 0
+        metrics["max_size_delta_ratio"] = max(metrics["width_delta_ratio"], metrics["height_delta_ratio"])
+
+    for index, (previous_center, current_center, previous_size, current_size) in enumerate(zip(
+        metrics["centers"],
+        metrics["centers"][1:],
+        metrics["sizes"],
+        metrics["sizes"][1:]
+    )):
+        if not previous_center or not current_center or not previous_size or not current_size:
+            continue
+        center_shift = math.sqrt(
+            (current_center[0] - previous_center[0]) ** 2 +
+            (current_center[1] - previous_center[1]) ** 2
+        )
+        width_delta = abs(current_size[0] - previous_size[0]) / max(previous_size[0], current_size[0], 1)
+        height_delta = abs(current_size[1] - previous_size[1]) / max(previous_size[1], current_size[1], 1)
+        size_delta = max(width_delta, height_delta)
+        metrics["max_adjacent_center_shift"] = max(metrics["max_adjacent_center_shift"], round(center_shift, 2))
+        metrics["max_adjacent_size_delta_ratio"] = max(metrics["max_adjacent_size_delta_ratio"], round(size_delta, 4))
+        if center_shift > 44 or size_delta > 0.22:
+            metrics["jump_pairs"].append({
+                "from": index,
+                "to": index + 1,
+                "center_shift": round(center_shift, 2),
+                "size_delta_ratio": round(size_delta, 4)
+            })
+    return metrics
+
+
 def strip_size_compatible(actual_size, expected_size, tolerance=0.08):
     actual_width, actual_height = actual_size
     expected_width, expected_height = expected_size
@@ -636,6 +722,7 @@ def write_manual_review(run_dir, manifest, validations):
             f"Avoid: {action.get('avoid', '') or 'none'}",
             "- [ ] identity stays the same as reference.png and decoded/canonical-base.png",
             "- [ ] action matches description using body posture, not detached effects",
+            "- [ ] all frames stay in a fixed cell with stable center, scale, and no sudden jump cuts",
             "- [ ] avoid list is respected",
             "- [ ] every frame shows the full character with no clipping or body parts crossing cell boundaries",
             "- [ ] no text, labels, frame numbers, borders, guide marks, UI, bubbles, detached icons, shadow, floor, scenery, white background, or checkerboard",
@@ -708,6 +795,7 @@ def write_run_summary(run_dir, manifest, validations, review_record=None):
                 "transparent_strip": action.get("transparent_strip", str(run_dir / "final" / f"{action.get('id')}.png")),
                 "frames_dir": str(run_dir / "frames" / str(action.get("id"))),
                 "preview": str(qa_dir / "previews" / f"{action.get('id')}.gif"),
+                "alignment": action.get("alignment") or {},
                 "errors": action.get("errors", []),
                 "warnings": action.get("warnings", [])
             }
@@ -749,7 +837,8 @@ def write_output_manifest(run_dir, manifest, validations):
                     for frame_index, frame in enumerate(action.get("frames", []))
                 ],
                 "preview": str(run_dir / "qa" / "previews" / f"{action.get('id')}.gif"),
-                "motion": action.get("motion") or {}
+                "motion": action.get("motion") or {},
+                "alignment": action.get("alignment") or {}
             }
             for index, action in enumerate(playable_actions)
         ]
@@ -793,7 +882,8 @@ def write_provenance(run_dir, manifest, status, validations):
             "preview": str(qa_dir / "previews" / f"{action_id}.gif"),
             "errors": action.get("errors", []),
             "warnings": action.get("warnings", []),
-            "motion": action.get("motion") or {}
+            "motion": action.get("motion") or {},
+            "alignment": action.get("alignment") or {}
         })
     write_json(qa_dir / "provenance.json", provenance)
     validations["provenance"] = str(qa_dir / "provenance.json")
@@ -953,8 +1043,22 @@ def process_run(args):
         action_result["frames"] = frame_results
         action_result["transparent_strip"] = str(final_dir / f"{action_id}.png")
         action_result["motion"] = motion_metrics(frames)
+        action_result["alignment"] = alignment_metrics(frames)
         if frame_count > 1 and action_result["motion"]["near_duplicate_pairs"] >= frame_count - 1:
             action_result["warnings"].append("motion appears nearly static across generated frames")
+        alignment = action_result["alignment"]
+        if alignment["center_x_range"] > 60:
+            action_result["errors"].append("character horizontal center drifts too much across frames")
+        elif alignment["center_x_range"] > 36:
+            action_result["warnings"].append("character horizontal center varies; inspect fixed-cell centering")
+        if alignment["max_size_delta_ratio"] > 0.4:
+            action_result["errors"].append("character scale changes too much across frames")
+        elif alignment["max_size_delta_ratio"] > 0.22:
+            action_result["warnings"].append("character size varies; inspect scale consistency")
+        if alignment["max_adjacent_center_shift"] > 80:
+            action_result["errors"].append("adjacent frames jump too far; regenerate smoother motion")
+        elif alignment["jump_pairs"]:
+            action_result["warnings"].append("possible adjacent-frame jump detected; inspect GIF preview")
         if action_result["errors"]:
             validations["ok"] = False
         transparent_strip = compose_strip(frames)
@@ -1086,7 +1190,7 @@ def main():
     process_parser = subparsers.add_parser("process")
     process_parser.add_argument("--run-dir", required=True)
     process_parser.add_argument("--tolerance", type=int, default=80)
-    process_parser.add_argument("--gif-duration", type=int, default=120)
+    process_parser.add_argument("--gif-duration", type=int, default=80)
     process_parser.add_argument("--skip-spritesheet", action="store_true")
 
     mark_parser = subparsers.add_parser("mark")

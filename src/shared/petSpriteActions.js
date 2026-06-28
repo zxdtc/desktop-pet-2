@@ -27,6 +27,8 @@ const knownActionIds = new Map([
 
 const defaultAvoidItems = 'text, labels, frame numbers, borders, UI, speech bubbles, thought bubbles, floating symbols, detached effects, props, shadows, floor, scenery, background';
 const bodyPosturePhrase = 'Use body posture and facial expression only, not detached effects.';
+const defaultFrameCount = 12;
+const defaultChromaKey = '#00FF00';
 
 export function normalizeSpriteActionId(value, index = 0) {
   const raw = String(value || '').trim();
@@ -57,7 +59,7 @@ export function normalizeStructuredSpriteActions(rawValue, defaults = {}) {
     const id = normalizeSpriteActionId(actionSource.id || actionSource.name || actionSource.action || actionSource.label, index);
     const frameCount = Number.isInteger(Number(actionSource.frame_count)) && Number(actionSource.frame_count) > 0
       ? Number(actionSource.frame_count)
-      : 6;
+      : defaultFrameCount;
     const rawDescription = String(actionSource.description || actionSource.requirement || actionSource.prompt || '').trim();
     const description = rawDescription.includes(bodyPosturePhrase)
       ? rawDescription
@@ -76,9 +78,9 @@ export function normalizeStructuredSpriteActions(rawValue, defaults = {}) {
   const structured = {
     pet_name: String(source.pet_name || source.petName || defaults.petName || '').trim(),
     style_notes: String(source.style_notes || source.styleNotes || defaults.styleNotes || '').trim(),
-    chroma_key: ['#0000FF', '#00FF00'].includes(String(source.chroma_key || source.chromaKey || defaults.chromaKey || '#0000FF').trim().toUpperCase())
-      ? String(source.chroma_key || source.chromaKey || defaults.chromaKey || '#0000FF').trim().toUpperCase()
-      : '#0000FF',
+    chroma_key: ['#0000FF', '#00FF00'].includes(String(source.chroma_key || source.chromaKey || defaults.chromaKey || defaultChromaKey).trim().toUpperCase())
+      ? String(source.chroma_key || source.chromaKey || defaults.chromaKey || defaultChromaKey).trim().toUpperCase()
+      : defaultChromaKey,
     actions
   };
 
@@ -110,20 +112,20 @@ export function createSpriteActionStructureMessages(config = {}) {
   const payload = {
     pet_name: String(config.petName || '').trim(),
     style_notes: String(config.styleNotes || '').trim(),
-    chroma_key: String(config.chromaKey || '#0000FF').trim() || '#0000FF',
+    chroma_key: String(config.chromaKey || defaultChromaKey).trim() || defaultChromaKey,
     natural_language: String(config.naturalLanguage || '').trim()
   };
   return [
     {
       role: 'system',
       content: [
-        'Return only strict JSON with this shape: {"pet_name":"","style_notes":"","chroma_key":"#0000FF","actions":[{"id":"idle","frame_count":6,"description":"","avoid":""}]}.',
+        'Return only strict JSON with this shape: {"pet_name":"","style_notes":"","chroma_key":"#00FF00","actions":[{"id":"idle","frame_count":12,"description":"","avoid":""}]}.',
         'Convert user desktop-pet action requirements into actions.',
         'Use lowercase English ids with letters, numbers, hyphen, or underscore only. Translate common Chinese action names, for example 开心 -> happy, 难过 -> sad, 待机 -> idle.',
-        'Default frame_count to 6 unless the user explicitly says another number.',
-        'Every description must describe body posture or facial expression and must not rely on detached effects.',
+        'Use frame_count 12 for every action by default. Only use another count if the user explicitly edits the JSON later.',
+        'Every description must describe a coherent 12-frame motion using body posture and facial expression, not detached effects.',
         'Every avoid field must include bans for text, symbols, props, detached effects, UI, shadows, floor, and scenery.',
-        'Use chroma_key #0000FF unless the user explicitly asks for #00FF00.'
+        'Use chroma_key #00FF00 for pure green background unless the existing input explicitly provides another supported chroma key.'
       ].join(' ')
     },
     {

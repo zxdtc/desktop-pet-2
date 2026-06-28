@@ -9,7 +9,7 @@ import {
 const modelResult = {
   pet_name: 'Border Collie',
   style_notes: 'cute semi-realistic plush desktop pet, readable at 192x208',
-  chroma_key: '#0000FF',
+  chroma_key: '#00FF00',
   actions: [
     {
       id: '待机',
@@ -18,7 +18,7 @@ const modelResult = {
     },
     {
       id: '开心',
-      frame_count: 6,
+      frame_count: 12,
       description: 'happy bounce in place, smiling, ears perk up',
       avoid: 'confetti'
     },
@@ -33,9 +33,9 @@ const modelResult = {
 const normalized = normalizeStructuredSpriteActions(modelResult);
 assert.equal(normalized.ok, true);
 assert.equal(normalized.data.pet_name, 'Border Collie');
-assert.equal(normalized.data.chroma_key, '#0000FF');
+assert.equal(normalized.data.chroma_key, '#00FF00');
 assert.deepEqual(normalized.data.actions.map((action) => action.id), ['idle', 'happy', 'sad']);
-assert.deepEqual(normalized.data.actions.map((action) => action.frame_count), [6, 6, 6]);
+assert.deepEqual(normalized.data.actions.map((action) => action.frame_count), [12, 12, 12]);
 assert.equal(normalized.data.actions.length, 3);
 for (const action of normalized.data.actions) {
   assert.match(action.description, /Use body posture and facial expression only/);
@@ -56,19 +56,19 @@ assert.throws(() => extractJsonObject('not json'), /有效 JSON|JSON/);
 const messages = createSpriteActionStructureMessages({
   petName: 'Border Collie',
   styleNotes: 'soft fluffy fur',
-  chromaKey: '#0000FF',
-  naturalLanguage: '待机、开心、难过，每个 6 帧'
+  chromaKey: '#00FF00',
+  naturalLanguage: 'idle, happy, sad, 12 frames each'
 });
 assert.equal(messages.length, 2);
 assert.match(messages[0].content, /Return only strict JSON/);
-assert.match(messages[0].content, /Default frame_count to 6/);
+assert.match(messages[0].content, /frame_count 12/);
 assert.match(messages[1].content, /Border Collie/);
 
 const invalid = normalizeStructuredSpriteActions({ actions: [] });
 assert.equal(invalid.ok, false);
 assert.match(invalid.errors[0], /1 个动作/);
 
-const malformedActionText = JSON.stringify([{ id: 'idle', frame_count: 6 }]);
+const malformedActionText = JSON.stringify([{ id: 'idle', frame_count: 12 }]);
 assert.equal(parseAndValidateSpriteActions(malformedActionText).ok, false);
 
 console.log('pet sprite structure ok');

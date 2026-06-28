@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageEnhance
 
 
-DEFAULT_CHROMA = "#0000FF"
+DEFAULT_CHROMA = "#00FF00"
 
 
 def parse_hex_color(value):
@@ -120,7 +120,7 @@ def transform_for_action(action_id, index, count):
 
 
 def make_strip(subject, action, cell_width, cell_height, chroma):
-    frame_count = int(action.get("frame_count", 6))
+    frame_count = int(action.get("frame_count", 12))
     frames = []
     for index in range(frame_count):
         cell = Image.new("RGBA", (cell_width, cell_height), (*chroma, 255))

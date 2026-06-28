@@ -160,9 +160,9 @@ def main():
     for expected in (
         "Use the provided reference image as the identity reference",
         "Single complete full-body character",
-        "Centered, generous padding, no clipping",
+        "Centered in one fixed 192x208 cell, bottom-center anchored",
         "Readable at 192x208 desktop-pet size",
-        "Flat solid #0000FF chroma-key background",
+        "Perfectly flat solid #0000FF chroma-key background",
         "Save selected image as decoded/canonical-base.png"
     ):
         if expected not in base_prompt_text:
@@ -171,8 +171,9 @@ def main():
     for expected in (
         'Generate one horizontal sprite strip for action: "happy"',
         "Preserve the same character from the reference image",
-        "Create exactly 3 separated full-body frames in one horizontal row",
-        "Each frame must fit a 192x208 desktop-pet cell",
+        "Create exactly 3 coherent full-body frames in one horizontal row",
+        "Treat the strip as 3 equal fixed cells, each 192x208",
+        "Avoid jump cuts",
         "Use a perfectly flat solid #0000FF chroma-key background",
         "No text, labels, frame numbers, borders, guide marks, UI",
         "Also avoid: floating hearts, detached effects",
